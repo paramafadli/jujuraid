@@ -1,0 +1,69 @@
+
+Case:
+
+Buatlah query yang menampilkan semua kategori dan item baik laku maupun
+tidak laku, semua itemnya, Qty (kalau tidak laku maka tampilkan 0), dan SubTotal
+(kalau tidak laku maka tampil 0) 
+untuk (WHERE): 
+- outlet bernama Mie Rampok Manukan Surabaya 
+(PerusahaanNo=639, DeviceID=1356) 
+- pada tanggal (kolom SaleDate) = '2017-05-11'
+
+Query:
+
+use nutacloud;
+
+SELECT imm.CategoryName, imm.ItemName, 
+ifnull(sii.Quantity,0) as Qty, 
+ifnull(sii.SubTotal,0) as SubTotal
+FROM
+(select mi.PerusahaanNo, mi.DeviceID, mi.ItemID, 
+mi.ItemName, mc.CategoryName
+from mastercategory mc, masteritem mi
+where mi.PerusahaanNo = "639"
+AND mi.DeviceID = "1356"
+AND mc.PerusahaanNo = mi.PerusahaanNo
+AND mc.DeviceID = mi.DeviceID
+AND mc.CategoryID = mi.CategoryID
+AND mc.DeviceNo = mi.DeviceNo) imm
+LEFT JOIN
+(select ss.PerusahaanNo, ss.DeviceID, 
+sid.ItemID, sid.ItemName, 
+sum(sid.Quantity) as Quantity, sum(sid.SubTotal) as SubTotal
+from sale ss, saleitemdetail sid
+where ss.PerusahaanNo = "639"
+AND ss.DeviceID = "1356"
+AND ss.SaleDate = "2017-05-11"
+AND ss.PerusahaanNo = sid.PerusahaanNo
+AND ss.DeviceID = sid.DeviceID
+AND ss.DeviceNo = sid.DeviceNo
+AND ss.TransactionID = sid.TransactionID
+GROUP BY sid.ItemID) sii
+ON imm.ItemID = sii.ItemID;
+
+
+SELECT cai.campaign_id, titles, date_expired,
+            approved_donation, 
+            ifnull(sum_donation,0) as sum_donation,
+            ifnull((approved_donation-sum_donation),approved_donation) as remaining_donation,
+            ifnull(((sum_donation/approved_donation)*100),0) as donation_progress,
+            created_date, verification_code
+                FROM (SELECT campaign_id, `verification_code`, 
+                    `titles`, `approved_donation`, created_date,
+                    datediff(`expired_donation`, NOW()) as date_expired
+                    FROM `js_campaign`
+                    WHERE verification_status = 'active'
+                    AND is_reported = 'no') as cai
+                   LEFT JOIN
+                   (SELECT `campaign_id`, 
+                    SUM(`amount_for_campaign`) as sum_donation 
+                    FROM `js_donation`
+                    WHERE campaign_id IN (
+                        SELECT campaign_id FROM js_campaign
+                        WHERE verification_status = 'active'
+                        AND is_reported = 'no'
+                        )
+                    GROUP BY `campaign_id`) as doi
+            ON cai.campaign_id = doi.campaign_id
+            order by created_date DESC 
+            limit 0,100;
